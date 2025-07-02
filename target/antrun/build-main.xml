@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="maven-antrun-" default="main">
+  <target name="main">
+    <copy todir="C:\Users\82103\OneDrive\바탕 화면\sts\workspaces\art-gr\target/classes/public">
+      <fileset dir="C:\Users\82103\OneDrive\바탕 화면\sts\workspaces\art-gr/pictr/build" />
+    </copy>
+  </target>
+</project>
