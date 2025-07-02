@@ -1,6 +1,7 @@
 import React, {useState, useRef, useEffect} from "react";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import {Container, Card, Form, Button, Alert, Modal, ListGroup} from 'react-bootstrap';
+import { MAX_LENGTH } from "../js/common/constants";
 
 //이미지 파일 업로드
 function UploadForm() {
@@ -16,6 +17,8 @@ function UploadForm() {
     const [fileToDelete, setFileToDelete] = useState(null); //삭제할 파일 ID
     const fileInputRef = useRef(null); //파일 입력 필드 참조(Ref for File Input)
 
+    //화면 Mount 시 db.json 파일의 uploads 내 리스트를 출력
+    //API 호출 시 이미지 등록한 사용자로 조회하도록 변경 필요
     useEffect(() => {
         fetch('http://localhost:3000/uploads')
         .then(res => res.json())
@@ -29,32 +32,75 @@ function UploadForm() {
         if(selectedFile) {
             setFile(selectedFile); //파일 상태 업데이트
 
+            //이미지 파일인 경우
             if(selectedFile.type.startsWith('image/')) {
                 const reader = new FileReader();
                 reader.onload = () => { //파일 읽기가 완료되면 실행될 콜백 함수
-                    setPreviewUrl(reader.result); //미리보기 URL 상태 업데이트
+                    setPreviewUrl(reader.result); //미리보기 URL 상태 업데이트 (reader.result: 파일의 내용을 Base64로 인코딩한 클라이언트 측 데이터 URL)
                 }
 
                 reader.readAsDataURL(selectedFile);
+            } else /* 이미지 파일이 아닌 경우 */ {
+                alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
+                setFile(null); //파일 초기화
+                return;
             }
-        } else {
-            setPreviewUrl(''); //이미지가 아니면 미리보기 초기화
         }
-    };
-
-    //제목 입력 핸들러
-    const handleTitleChange = (e) => {
-        setTitle(e.target.value); //제목 상태 업데이트
-    };
-
-    //설명 입력 핸들러
-    const handleDescriptionChange = (e) => {
-        setDescription(e.target.value); //설명 상태 업데이트
+        // else {
+        //     setPreviewUrl(''); //이미지가 아니면 미리보기 초기화 (이전 이미지가 선택되어 있는 상태에서 취소 처리를 할 경우 초기화)
+        // }
     };
 
     //파일 선택 버튼 클릭 핸들러
     const handleSelectFile = () => {
         fileInputRef.current.click(); //숨겨진 input 요소를 클릭하여 파일 선택 창 열기
+    };
+
+    //파일을 끌어다 놓을 때 핸들러
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const droppedFile = e.dataTransfer.files[0]; //dataTransfer: 드래그 앤 드롭(Drag and Drop) 이벤트를 처리할 때 사용되는 객체
+        if (droppedFile) {
+            setFile(droppedFile);
+
+            //이미지 파일인 경우
+            if(droppedFile.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = () => setPreviewUrl(reader.result);
+                reader.readAsDataURL(droppedFile);
+            } else /* 이미지 파일이 아닌 경우 */ {
+                alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
+                setFile(null); //파일 초기화
+                return;
+            }
+        }
+    };
+
+    //파일을 드롭했을 때 브라우저가 파일을 열거나 다운로드하지 않도록 막음.
+    const handleDragOver = (e) => {
+        e.preventDefault(); // Drop 허용
+    };
+
+    //제목 입력 핸들러
+    const handleTitleChange = (e) => {
+        const input = e.target.value;
+        if(input.length <= MAX_LENGTH.MAX_TITLE_LENGTH) {
+            setTitle(input); //제목 상태 업데이트
+        } else {
+            alert(`제목은 ${MAX_LENGTH.MAX_TITLE_LENGTH}자 이내로 입력해주세요.`);
+            setTitle(input.slice(0, MAX_LENGTH.MAX_TITLE_LENGTH));
+        }
+    };
+
+    //설명 입력 핸들러
+    const handleDescriptionChange = (e) => {
+        const input = e.target.value;
+        if(input.length <= MAX_LENGTH.MAX_DESCIPTION_LENGTH) {
+            setDescription(input);  //설명 상태 업데이트
+        } else {
+            alert(`설명은 ${MAX_LENGTH.MAX_DESCIPTION_LENGTH}자 이내로 입력해주세요.`);
+            setDescription(input.slice(0, MAX_LENGTH.MAX_DESCIPTION_LENGTH));  //설명 상태 업데이트
+        }
     };
 
     //업로드 핸들러
@@ -68,7 +114,13 @@ function UploadForm() {
             alert('제목을 입력해 주세요!');
             return;
         }
+
+        if(!description.trim()) {
+            alert('설명을 입력해 주세요!');
+            return;
+        }
         
+        //API 개발 시 수정 필요함.
         const newFileEntry = {
             id: Date.now(),
             fileName: file.name,
@@ -79,6 +131,7 @@ function UploadForm() {
         };
         
         try {
+            //API 개발 시 수정 필요함.
             const response = await fetch('http://localhost:3000/uploads', {
                 method: 'POST',
                 headers: {
@@ -89,9 +142,10 @@ function UploadForm() {
 
             if(response.ok) {
                 const saved = await response.json();
-                //기존 파일 목록에 새 파일 추가
-                const updatedFiles = [...uploadedFiles, saved];
+                //기존 파일 목록에 새 파일 추가. 최근에 올린 이미지를 최상단에 위치 시킴.
+                const updatedFiles = [saved, ...uploadedFiles];
                 setUploadedFiles(updatedFiles);
+                
                 //JSON 파일 형태로 로컬 스토리지에 저장
                 localStorage.setItem('uploadedFiles', JSON.stringify(updatedFiles));
                 //임시 저장 데이터 삭제
@@ -216,23 +270,7 @@ function UploadForm() {
     }
     };
 
-    const handleDrop = (e) => {
-        e.preventDefault();
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile) {
-            setFile(droppedFile);
-            if(droppedFile.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = () => setPreviewUrl(reader.result);
-                reader.readAsDataURL(droppedFile);
-            }
-        }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault(); // Drop 허용
-    };
-
+    
     return (
       <Container className="py-4">
         <Card className='shadow'>

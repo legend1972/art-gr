@@ -1,0 +1,5 @@
+// export const MAX_TITLE_LENGTH = 10;
+export const MAX_LENGTH = {
+    MAX_TITLE_LENGTH: 50,
+    MAX_DESCIPTION_LENGTH: 100
+}
