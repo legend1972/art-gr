@@ -251,7 +251,7 @@ function UploadForm() {
     //파일 삭제 최종 확인 및 처리
     const handleDeleteConfirmed = async () => {
     try {
-        const response = await fetch(`http://localhost:3000/uploads/${Number(fileToDelete)}`, {
+        const response = await fetch(`http://localhost:3000/uploads/${fileToDelete}`, {
         method: 'DELETE'
         });
 
