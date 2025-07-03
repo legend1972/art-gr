@@ -1,13 +1,19 @@
 import React, {useState, useRef, useEffect} from "react";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import {Container, Card, Form, Button, Alert, Modal, ListGroup} from 'react-bootstrap';
+import {Container, Card, Form, Button, Alert, Modal, ListGroup, Row, Col} from 'react-bootstrap';
 import { MAX_LENGTH } from "../js/common/constants";
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import '../css/CustomDatePicker.css';
+import { format } from 'date-fns';
 
 //이미지 파일 업로드
 function UploadForm() {
     const [file, setFile] = useState(null); //선택된 파일 객체
     const [title, setTitle] = useState(''); //제목
     const [description, setDescription] = useState(''); //설명
+    const [titleofwork, setTitleofwork] = useState(''); //작품명
+    const [workYearMonth, setWorkYearMonth] = useState(null); //작품년월
     const [previewUrl, setPreviewUrl] = useState(''); //이미지 미리보기 URL
     const [showModal, setShowModal] = useState(false); //취소 모달 열림/닫힘 상태
     const [hasDraft, setHasDraft] = useState(false); //임시저장된 데이터 존재
@@ -15,6 +21,7 @@ function UploadForm() {
     const [showFileList, setShowFileList] = useState(false); //업로드된 파일 목록 보기/숨기기
     const [showDeleteModal, setShowDeleteModal] = useState(false); //파일 삭제 확인 모달
     const [fileToDelete, setFileToDelete] = useState(null); //삭제할 파일 ID
+    const [selectedFileId, setSelectedFileId] = useState(null); // 선택된 파일 ID를 추적하기 위한 상태
     const fileInputRef = useRef(null); //파일 입력 필드 참조(Ref for File Input)
 
     //화면 Mount 시 db.json 파일의 uploads 내 리스트를 출력
@@ -46,9 +53,6 @@ function UploadForm() {
                 return;
             }
         }
-        // else {
-        //     setPreviewUrl(''); //이미지가 아니면 미리보기 초기화 (이전 이미지가 선택되어 있는 상태에서 취소 처리를 할 경우 초기화)
-        // }
     };
 
     //파일 선택 버튼 클릭 핸들러
@@ -103,6 +107,34 @@ function UploadForm() {
         }
     };
 
+    //작품명 입력 핸들러
+    const handleTitleofworkChange = (e) => {
+        const input = e.target.value;
+        if(input.length <= MAX_LENGTH.MAX_TITLE_OF_WORK) {
+            setTitleofwork(input);
+        } else {
+            alert(`작품명은 ${MAX_LENGTH.MAX_TITLE_OF_WORK}자 이내로 입력해주세요.`);
+            setTitleofwork(input.slice(0, MAX_LENGTH.MAX_TITLE_OF_WORK)); //작품명 상태 업데이트
+        }
+    };
+
+    //작품년월 입력 핸들러
+    const handleSelectDateChange = (date) => {
+        setWorkYearMonth(date ? format(date, 'yyyyMM') : null);
+    }
+
+    // 파일 선택 시 폼에 데이터 채우기 (수정 모드)
+    const handleEditFile = (file) => {
+        setSelectedFileId(file.id); // 수정할 파일 ID 저장
+        setTitle(file.title || '');
+        setDescription(file.description || '');
+        setTitleofwork(file.titleofwork || '');
+        setWorkYearMonth(file.workYearMonth || null);
+        setPreviewUrl(file.imageUrl || '');
+        setFile(null); // 파일은 다시 선택해야 함
+        alert('파일 정보를 불러왔습니다. 이미지를 변경하려면 새 파일을 선택하세요.');
+    };
+
     //업로드 핸들러
     const handleUpload = async () => {
         if(!file) {
@@ -119,31 +151,54 @@ function UploadForm() {
             alert('설명을 입력해 주세요!');
             return;
         }
+
+        if(!titleofwork.trim()) {
+            alert('작품명을 입력해 주세요!');
+            return;
+        }
+
+        if(!workYearMonth) {
+            alert('작품년월을 입력해 주세요!');
+            return;
+        }
         
         //API 개발 시 수정 필요함.
         const newFileEntry = {
-            id: Date.now(),
-            fileName: file.name,
-            title: title,
-            description: description,
+            id: selectedFileId || String(Date.now()),
+            fileName: file ? file.name : uploadedFiles.find(f => f.id === selectedFileId)?.fileName,
+            title,
+            description,
+            titleofwork,
+            workYearMonth,
             imageUrl: previewUrl, //미리보기 URL을 이미지 URL로 저장 (실제는 서버 URL)
             uploadDate: new Date().toISOString() //업로드 날짜 기록
         };
         
         try {
             //API 개발 시 수정 필요함.
-            const response = await fetch('http://localhost:3000/uploads', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(newFileEntry)
+            const url = selectedFileId
+                ? `http://localhost:3000/uploads/${selectedFileId}`
+                : 'http://localhost:3000/uploads';
+            const method = selectedFileId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newFileEntry),
             });
 
             if(response.ok) {
                 const saved = await response.json();
+                let updatedFiles;
                 //기존 파일 목록에 새 파일 추가. 최근에 올린 이미지를 최상단에 위치 시킴.
-                const updatedFiles = [saved, ...uploadedFiles];
+                if (selectedFileId) {
+                    // 기존 파일 업데이트
+                    updatedFiles = uploadedFiles.map(f => (f.id === selectedFileId ? saved : f));
+                } else {
+                    // 새 파일 추가
+                    updatedFiles = [saved, ...uploadedFiles];
+                }
+
                 setUploadedFiles(updatedFiles);
                 
                 //JSON 파일 형태로 로컬 스토리지에 저장
@@ -155,9 +210,12 @@ function UploadForm() {
                 //폼 초기화
                 resetForm();
 
-                alert('업로드 성공');
+                // 수정 모드 종료
+                setSelectedFileId(null);
+
+                alert(selectedFileId ? '수정 성공' : '업로드 성공');
             } else {
-                alert('업로드 실패');
+                alert(selectedFileId ? '수정 실패' : '업로드 실패');
             }
         } catch (error) {
             console.error('업로드 중 오류 발생: ', error);
@@ -169,7 +227,10 @@ function UploadForm() {
         setFile(null);
         setTitle('');
         setDescription('');
+        setTitleofwork('');
         setPreviewUrl('');
+        setWorkYearMonth('');
+        setSelectedFileId(null); // 수정 모드 초기화
         if(fileInputRef.current) {
             fileInputRef.current.value = ''; //파일 입력 필드 초기화
         }
@@ -178,7 +239,7 @@ function UploadForm() {
     //취소 버튼 핸들러
     const handleCancel = () => {
         //현재 입력된 데이터가 있을 때만 모달을 띄움
-        if(file || title || description) {
+        if(file || title || description || titleofwork || workYearMonth) {
             setShowModal(true); // 모달 표시
         } else {
             resetForm(); // 바로 리셋
@@ -190,6 +251,8 @@ function UploadForm() {
         const draftData = {
             title,
             description,
+            titleofwork,
+            workYearMonth,
             //파일 객체는 로컬 스토리지에 직접 저장할 수 없음.
             //그래서 미리보기 URL만 저장하고, 파일은 다시 선택하게 해야 함.
             previewUrl,
@@ -213,6 +276,8 @@ function UploadForm() {
             setTitle(draftData.title || ''); //저장된 제목 불러오기
             setDescription(draftData.description || ''); //저장된 설명 불러오기
             setPreviewUrl(draftData.previewUrl || ''); //저장된 미리보기 URL 불러오기
+            setTitleofwork(draftData.titleofwork || ''); //저장된 작품명 불러오기
+            setWorkYearMonth(draftData.workYearMonth || ''); //저장된 작품년월 불러오기
 
             //파일 객체는 로컬 스토리지에 저장되지 않으므로, 사용자에게 다시 선택하도록 안내
             if(draftData.previewUrl) {
@@ -244,6 +309,7 @@ function UploadForm() {
 
     //파일 삭제 확인 모달 열기
     const confirmDeleteFile = (id) => {
+        console.log('confirmDeleteFile 호출: ', typeof id);
         setFileToDelete(id); //삭제할 파일의 ID 저장
         setShowDeleteModal(true); //삭제 확인 모달 열기
     };
@@ -251,8 +317,10 @@ function UploadForm() {
     //파일 삭제 최종 확인 및 처리
     const handleDeleteConfirmed = async () => {
     try {
-        const response = await fetch(`http://localhost:3000/uploads/${fileToDelete}`, {
-        method: 'DELETE'
+        const idToDelete = String(fileToDelete);
+
+        const response = await fetch(`http://localhost:3000/uploads/${idToDelete}`, {
+            method: 'DELETE'
         });
 
         if (response.ok) {
@@ -260,6 +328,8 @@ function UploadForm() {
             setUploadedFiles(updatedFiles);
             localStorage.setItem('uploadedFiles', JSON.stringify(updatedFiles)); // 추가
             alert('파일이 삭제되었습니다.');
+        }else {
+            alert('삭제 실패: 파일을 찾을 수 없습니다.');
         }
     } catch (error) {
         console.error('삭제 중 오류 발생:', error);
@@ -270,13 +340,20 @@ function UploadForm() {
     }
     };
 
+    // yyyyMM 문자열을 Date 객체로 변환
+    const parseDate = (dateString) => {
+        if (!dateString || dateString.length !== 6) return null;
+        const year = parseInt(dateString.slice(0, 4), 10);
+        const month = parseInt(dateString.slice(4, 6), 10) - 1; // 월은 0부터 시작
+        return new Date(year, month);
+    };
     
     return (
       <Container className="py-4">
         <Card className='shadow'>
             <Card.Header className="bg-primary text-white">
                 <h2 className="mb-0 text-center">
-                    파일 업로드
+                    {selectedFileId ? '파일 수정' : '파일 업로드'}
                 </h2>
             </Card.Header>
             <Card.Body>
@@ -314,46 +391,97 @@ function UploadForm() {
                     <Form.Control as="textarea"  id="description" value={description} onChange={handleDescriptionChange} placeholder="설명을 입력하세요." rows="4"/>
                 </Form.Group>
 
+                <Form>
+                    <Row className="align-items-center">
+                        <Col xs="auto">
+                        <Form.Label htmlFor="titleofwork" className="mb-0 me-2">작품명</Form.Label>
+                        </Col>
+                        <Col xs="auto">
+                        <Form.Control
+                            type="text"
+                            id="titleofwork"
+                            value={titleofwork}
+                            onChange={handleTitleofworkChange}
+                            placeholder="작품명을 입력하세요."
+                            className="me-3"
+                            style={{ width: '600px' }}
+                        />
+                        </Col>
+                        <Col xs="auto">
+                        <Form.Label htmlFor="datePicker" className="mb-0 me-2">작품년월</Form.Label>
+                        </Col>
+                        <Col xs="auto">
+                        <DatePicker
+                            selected={parseDate(workYearMonth)}
+                            onChange={handleSelectDateChange}
+                            dateFormat="yyyy-MM"
+                            placeholderText="날짜를 선택하세요"
+                            isClearable
+                            id="datePicker"
+                            className="form-control"
+                            style={{ width: '150px' }}
+                        />
+                        </Col>
+                    </Row>
+                </Form>
+
                 <div className="d-flex justify-content-end gap-2 mt-4">
-                    <Button variant="success" onClick={handleUpload}>등록</Button>
-                    <Button variant="danger" onClick={handleCancel}>취소</Button>
-                </div>
+                        {selectedFileId ? (
+                            <Button variant="primary" onClick={handleUpload}>수정</Button>
+                        ) : (
+                            <Button variant="success" onClick={handleUpload}>등록</Button>
+                        )}
+                        <Button variant="danger" onClick={handleCancel}>취소</Button>
+                    </div>
 
                 <hr className="my-4"/>
 
                 <div className="d-grid gap-2">
                     <Button variant="info" onClick={toggleFileList}>
-                        {showFileList ? '업로드된 파일 숨기기': `업로드된 파일 보기 (${uploadedFiles.length} 개)`}
+                        {showFileList ? '업로드된 파일 숨기기' : `업로드된 파일 보기 (${uploadedFiles.length} 개)`}
                     </Button>
                 </div>
 
                 {showFileList && (
-                    <div className="mt-4">
-                        {uploadedFiles.length === 0 ? (
-                            <Alert variant="info" className="text-center">아직 업로드된 파일이 없습니다.</Alert>
-                        ) : (
-                            <ListGroup>
-                                {uploadedFiles.map(item => (
-                                    <ListGroup.Item key={item.id} className="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h5 className="mb-1">{item.title}</h5>
-                                            <p className="mb-1 text-muted">{item.fileName}</p>
-                                            <small className="text-muted">{item.description}</small>
-                                            {item.imageUrl && (
-                                                <div className="mt-2">
-                                                    <img src={item.imageUrl} alt={item.title} style={{maxWidth: '100px', maxHeight: '100px', borderRadius: '5px'}}/>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <Button variant="outline-danger" size="sm" onClick={()=>{
-                                            confirmDeleteFile(item.id)
-                                        }}>삭제</Button>
-                                    </ListGroup.Item>
-                                ))}
-                            </ListGroup>
-                        )}
-                    </div>
-                )}
+                        <div className="mt-4">
+                            {uploadedFiles.length === 0 ? (
+                                <Alert variant="info" className="text-center">아직 업로드된 파일이 없습니다.</Alert>
+                            ) : (
+                                <ListGroup>
+                                    {uploadedFiles.map(item => (
+                                        <ListGroup.Item
+                                            key={item.id}
+                                            className="d-flex justify-content-between align-items-center"
+                                            style={{ cursor: 'pointer' }}
+                                            onClick={() => handleEditFile(item)} // 클릭 시 수정 모드로 전환
+                                        >
+                                            <div>
+                                                <h5 className="mb-1">{item.title}</h5>
+                                                <p className="mb-1 text-muted">{item.fileName}</p>
+                                                <p className="mb-1 text-muted">{item.description}</p>
+                                                <small className="text-muted">{item.titleofwork}</small>
+                                                {item.imageUrl && (
+                                                    <div className="mt-2">
+                                                        <img src={item.imageUrl} alt={item.title} style={{ maxWidth: '100px', maxHeight: '100px', borderRadius: '5px' }} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Button
+                                                variant="outline-danger"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // 삭제 버튼 클릭 시 수정 모드 방지
+                                                    confirmDeleteFile(item.id);
+                                                }}
+                                            >
+                                                삭제
+                                            </Button>
+                                        </ListGroup.Item>
+                                    ))}
+                                </ListGroup>
+                            )}
+                        </div>
+                    )}
             </Card.Body>
         </Card>
 
