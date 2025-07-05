@@ -6,6 +6,10 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import '../css/CustomDatePicker.css';
 import { format } from 'date-fns';
+import axios from "axios";
+import { useParams } from "react-router-dom";
+
+const API_URL = "http://localhost:3000/artists";
 
 //이미지 파일 업로드
 function UploadForm() {
@@ -23,15 +27,19 @@ function UploadForm() {
     const [fileToDelete, setFileToDelete] = useState(null); //삭제할 파일 ID
     const [selectedFileId, setSelectedFileId] = useState(null); // 선택된 파일 ID를 추적하기 위한 상태
     const fileInputRef = useRef(null); //파일 입력 필드 참조(Ref for File Input)
+    const { id } = useParams();
+
+    console.log("id: ", id);
 
     //화면 Mount 시 db.json 파일의 uploads 내 리스트를 출력
     //API 호출 시 이미지 등록한 사용자로 조회하도록 변경 필요
     useEffect(() => {
-        fetch('http://localhost:3000/uploads')
-        .then(res => res.json())
-        .then(data => setUploadedFiles(data))
-        .catch(err => console.error('데이터 불러오기 오류:', err));
-    }, []);
+        if(id) {
+            axios.get(`${API_URL}/${id}`).then(res => {
+                setUploadedFiles(res.data.artworks || []);
+            }).catch(error => console.error("error fetch: ", error));
+        }
+    }, [id]);
 
     //파일 선택 핸들러
     const handleFileChange = (e) => {
@@ -162,61 +170,77 @@ function UploadForm() {
             return;
         }
         
-        //API 개발 시 수정 필요함.
-        const newFileEntry = {
-            id: selectedFileId || String(Date.now()),
-            fileName: file ? file.name : uploadedFiles.find(f => f.id === selectedFileId)?.fileName,
-            title,
-            description,
-            titleofwork,
-            workYearMonth,
-            imageUrl: previewUrl, //미리보기 URL을 이미지 URL로 저장 (실제는 서버 URL)
-            uploadDate: new Date().toISOString() //업로드 날짜 기록
-        };
+        // //API 개발 시 수정 필요함.
+        // const newFileEntry = {
+        //     id: selectedFileId || String(Date.now()),
+        //     fileName: file ? file.name : uploadedFiles.find(f => f.id === selectedFileId)?.fileName,
+        //     title,
+        //     description,
+        //     titleofwork,
+        //     workYearMonth,
+        //     imageUrl: previewUrl, //미리보기 URL을 이미지 URL로 저장 (실제는 서버 URL)
+        //     uploadDate: new Date().toISOString() //업로드 날짜 기록
+        // };
         
         try {
-            //API 개발 시 수정 필요함.
-            const url = selectedFileId
-                ? `http://localhost:3000/uploads/${selectedFileId}`
-                : 'http://localhost:3000/uploads';
-            const method = selectedFileId ? 'PUT' : 'POST';
+            const response = await axios.get(`${API_URL}/${id}`);
+            let imageUrl = previewUrl;
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newFileEntry),
+            //API 개발 시 수정 필요함.
+            // const url = selectedFileId
+            //     ? `${API_URL}?id=${id}/${selectedFileId}`
+            //     : `${API_URL}?id=${id}`;
+            // const method = selectedFileId ? 'PUT' : 'POST';
+
+            // const response = await axios(url, {
+            //     method,
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify(newFileEntry),
+            // });
+
+            const newFileEntry = {
+                id: selectedFileId || String(Date.now()),
+                fileName: file ? file.name : uploadedFiles.find(f => f.id === selectedFileId)?.fileName,
+                title,
+                description,
+                titleofwork,
+                workYearMonth,
+                imageUrl,
+                uploadDate: new Date().toISOString()
+            };
+
+            const artist = response.data;
+
+            let updatedArtworks;
+            //기존 파일 목록에 새 파일 추가. 최근에 올린 이미지를 최상단에 위치 시킴.
+            if (selectedFileId) {
+                // 기존 파일 업데이트
+                updatedArtworks = artist.artworks.map(artwork => artwork.id === selectedFileId ? newFileEntry : artwork);
+            } else {
+                // 새 파일 추가
+                updatedArtworks = [...(artist.artworks || []), newFileEntry];
+            }
+
+            await axios.put(`${API_URL}/${id}`, {
+                ...artist,
+                artworks: updatedArtworks
             });
 
-            if(response.ok) {
-                const saved = await response.json();
-                let updatedFiles;
-                //기존 파일 목록에 새 파일 추가. 최근에 올린 이미지를 최상단에 위치 시킴.
-                if (selectedFileId) {
-                    // 기존 파일 업데이트
-                    updatedFiles = uploadedFiles.map(f => (f.id === selectedFileId ? saved : f));
-                } else {
-                    // 새 파일 추가
-                    updatedFiles = [saved, ...uploadedFiles];
-                }
+            setUploadedFiles(updatedArtworks);
+            
+            //JSON 파일 형태로 로컬 스토리지에 저장
+            localStorage.setItem('uploadedFiles', JSON.stringify(updatedArtworks));
+            //임시 저장 데이터 삭제
+            localStorage.removeItem('uploadDraft');
+            setHasDraft(false);
 
-                setUploadedFiles(updatedFiles);
-                
-                //JSON 파일 형태로 로컬 스토리지에 저장
-                localStorage.setItem('uploadedFiles', JSON.stringify(updatedFiles));
-                //임시 저장 데이터 삭제
-                localStorage.removeItem('uploadDraft');
-                setHasDraft(false);
+            //폼 초기화
+            resetForm();
 
-                //폼 초기화
-                resetForm();
+            // 수정 모드 종료
+            setSelectedFileId(null);
 
-                // 수정 모드 종료
-                setSelectedFileId(null);
-
-                alert(selectedFileId ? '수정 성공' : '업로드 성공');
-            } else {
-                alert(selectedFileId ? '수정 실패' : '업로드 실패');
-            }
+            alert(selectedFileId ? '수정 성공' : '업로드 성공');
         } catch (error) {
             console.error('업로드 중 오류 발생: ', error);
         }
@@ -317,16 +341,22 @@ function UploadForm() {
     //파일 삭제 최종 확인 및 처리
     const handleDeleteConfirmed = async () => {
     try {
-        const idToDelete = String(fileToDelete);
 
-        const response = await fetch(`http://localhost:3000/uploads/${idToDelete}`, {
-            method: 'DELETE'
-        });
-
+        const response = await axios.get(`${API_URL}/${id}`);
+        
         if (response.ok) {
-            const updatedFiles = uploadedFiles.filter(file => file.id !== fileToDelete);
-            setUploadedFiles(updatedFiles);
-            localStorage.setItem('uploadedFiles', JSON.stringify(updatedFiles)); // 추가
+            const artist = response.data;
+            // artworks 배열에서 항목 제거
+            const updatedArtworks = artist.artworks.filter(artwork => artwork.id !== fileToDelete);
+
+            // 아티스트 데이터 업데이트
+            await axios.put(`${API_URL}/${id}`, {
+                ...artist,
+                artworks: updatedArtworks
+            });
+
+            setUploadedFiles(updatedArtworks);
+            localStorage.setItem('uploadedFiles', JSON.stringify(updatedArtworks)); // 추가
             alert('파일이 삭제되었습니다.');
         }else {
             alert('삭제 실패: 파일을 찾을 수 없습니다.');
@@ -391,40 +421,29 @@ function UploadForm() {
                     <Form.Control as="textarea"  id="description" value={description} onChange={handleDescriptionChange} placeholder="설명을 입력하세요." rows="4"/>
                 </Form.Group>
 
-                <Form>
-                    <Row className="align-items-center">
-                        <Col xs="auto">
-                        <Form.Label htmlFor="titleofwork" className="mb-0 me-2">작품명</Form.Label>
-                        </Col>
-                        <Col xs="auto">
-                        <Form.Control
-                            type="text"
-                            id="titleofwork"
-                            value={titleofwork}
-                            onChange={handleTitleofworkChange}
-                            placeholder="작품명을 입력하세요."
-                            className="me-3"
-                            style={{ width: '600px' }}
-                        />
-                        </Col>
-                        <Col xs="auto">
-                        <Form.Label htmlFor="datePicker" className="mb-0 me-2">작품년월</Form.Label>
-                        </Col>
-                        <Col xs="auto">
-                        <DatePicker
-                            selected={parseDate(workYearMonth)}
-                            onChange={handleSelectDateChange}
-                            dateFormat="yyyy-MM"
-                            placeholderText="날짜를 선택하세요"
-                            isClearable
-                            id="datePicker"
-                            className="form-control"
-                            style={{ width: '150px' }}
-                        />
-                        </Col>
-                    </Row>
-                </Form>
-
+                <Form.Group className="mb-3">
+                    <Form.Label htmlFor="titleofwork" className="mb-0 me-2">작품명</Form.Label>
+                    <Form.Control
+                                type="text"
+                                id="titleofwork"
+                                value={titleofwork}
+                                onChange={handleTitleofworkChange}
+                                placeholder="작품명을 입력하세요."
+                                className="me-3"
+                    />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                    <Form.Label htmlFor="datePicker" className="mb-0 me-2">작품년월</Form.Label>
+                    <DatePicker
+                                selected={parseDate(workYearMonth)}
+                                onChange={handleSelectDateChange}
+                                dateFormat="yyyy-MM"
+                                placeholderText="날짜를 선택하세요"
+                                isClearable
+                                id="datePicker"
+                                className="form-control"
+                    />
+                </Form.Group>
                 <div className="d-flex justify-content-end gap-2 mt-4">
                         {selectedFileId ? (
                             <Button variant="primary" onClick={handleUpload}>수정</Button>
@@ -433,9 +452,7 @@ function UploadForm() {
                         )}
                         <Button variant="danger" onClick={handleCancel}>취소</Button>
                     </div>
-
                 <hr className="my-4"/>
-
                 <div className="d-grid gap-2">
                     <Button variant="info" onClick={toggleFileList}>
                         {showFileList ? '업로드된 파일 숨기기' : `업로드된 파일 보기 (${uploadedFiles.length} 개)`}
