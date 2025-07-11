@@ -7,6 +7,8 @@ import ArtistForm from "./pages/ArtistForm";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import UploadForm from "./pages/UploadForm";
+// import ArticleDetail from "./pages/ArticleDetail";
+// import ArticleForm from "./pages/ArticleForm";
 
 function App() {
   return (
@@ -19,6 +21,8 @@ function App() {
           <Route path="/artist/:id" element={<ArtistDetail />}/>
           <Route path="/artwork/:id" element={<ArtworkDetail />}/>
           <Route path="/artist/upload/:id" element={<UploadForm/>}/>
+          {/* <Route path="/article/:artworkId" element={<ArticleDetail/>}/> */}
+          {/* <Route path="/article/edit/:id" element={<ArticleForm/>}/> */}
           <Route path="*" element={<NotFound />}/>
         </Routes>
       </Layout>

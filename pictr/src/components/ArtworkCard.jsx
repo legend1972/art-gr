@@ -8,7 +8,9 @@ import { Link } from 'react-router-dom';
 //text-decoration-none: Bootstrap 유틸리티 클래스로, 텍스트에 밑줄(underline) 등 장식이 보이지 않도록 제거하는 역할
 function ArtworkCard({ artwork }) {
     return (
+        // 나중에 완료되면 풀어야 함.
         <Card as={Link} to={`/artwork/${artwork.id}`} className="text-decoration-none text-dark">
+        {/* <Card className="text-decoration-none text-dark"> */}
             <Card.Img variant="top" src={artwork.imageUrl}/>
             <Card.Body>
                 <Card.Title>{artwork.title}</Card.Title>

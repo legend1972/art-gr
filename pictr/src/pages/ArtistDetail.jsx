@@ -5,15 +5,22 @@ import axios from 'axios';
 import ArtworkGallery from "../components/ArtworkGallery";
 
 const API_URL = 'http://localhost:3000/artists';
+const ARTWORK_API_URL = 'http://localhost:3000/artworks';
 
 function ArtistDetail() {
     const { id } = useParams();
     const [ artist, setArtist ] = useState(null);
-
+    const [ artworks, setArtworks] = useState([]);
+    
     useEffect(() => {
         axios.get(`${API_URL}?id=${id}`)
         .then(res => {
             if(res.data.length > 0) setArtist(res.data[0]);
+        });
+
+        axios.get(`${ARTWORK_API_URL}?artistId=${id}`)
+        .then(res => {
+            if(res.data.length > 0) setArtworks(res.data);
         });
     }, [id]);
 
@@ -33,7 +40,7 @@ function ArtistDetail() {
                         <p>{artist.bio}</p>
                         <hr/>
                         <h5>Featured Artworks</h5>
-                        <ArtworkGallery artworks={artist.artworks}/>
+                        <ArtworkGallery artworks={artworks}/>
                     </Col>
                 </Row>
             </Card>

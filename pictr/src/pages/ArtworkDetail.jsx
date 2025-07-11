@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Container, Card } from 'react-bootstrap';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/artists';
+const ARTWOKR_API_URL = 'http://localhost:3000/artworks';
 
 //작품 클릭 시 상세 보기
 function ArtworkDetail() {
@@ -11,10 +11,8 @@ function ArtworkDetail() {
     const [ artwork, setArtwork ] = useState(null);
 
     useEffect(() => {
-        axios.get(API_URL).then(res => {
-            const artworks = res.data.flatMap(a => a.artworks.map(aw => ({...aw, artistName: a.name})));
-            const found = artworks.find(a => a.id.toString() === id);
-            setArtwork(found);
+        axios.get(`${ARTWOKR_API_URL}?id=${id}`).then(res => {
+            setArtwork(res.data[0]);
         });
     }, [id]);
 

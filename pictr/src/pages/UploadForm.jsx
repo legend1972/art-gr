@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-const API_URL = "http://localhost:3000/artworks";
+const ARTWORK_API_URL = "http://localhost:3000/artworks";
 const UP_API_URL = "http://localhost:8080/api/upload-image";
 const DEL_API_URL = "http://localhost:8080/api/delete-image";
 
@@ -29,14 +29,13 @@ function UploadForm() {
     const [fileToDelete, setFileToDelete] = useState(null); //삭제할 파일 ID
     const [selectedFileId, setSelectedFileId] = useState(null); // 선택된 파일 ID를 추적하기 위한 상태
     const fileInputRef = useRef(null); //파일 입력 필드 참조(Ref for File Input)
-    // const { id } = useParams();
-    const id = "1";
+    const { id } = useParams();
     
     //화면 Mount 시 db.json 파일의 artworks 내 artistId 의 작품 리스트를 출력
     //API 호출 시 이미지 등록한 사용자로 조회하도록 변경 필요
     useEffect(() => {
         if(id) {
-            axios.get(`${API_URL}?artistId=${id}`).then(res => {
+            axios.get(`${ARTWORK_API_URL}?artistId=${id}`).then(res => {
                 setUploadedFiles(res.data || []);
             }).catch(error => console.error("error fetch: ", error));
         }
@@ -196,7 +195,7 @@ function UploadForm() {
             let artworks;
 
             //작가의 작품들 추출
-            const response = await axios.get(`${API_URL}?artistId=${id}`);
+            const response = await axios.get(`${ARTWORK_API_URL}?artistId=${id}`);
             if (response.status === 200) {
                 artworks = response.data;
             }
@@ -224,10 +223,10 @@ function UploadForm() {
             }
 
             if(selectedFileId) {
-                await axios.put(`${API_URL}/${selectedFileId}`, newFileEntry);
+                await axios.put(`${ARTWORK_API_URL}/${selectedFileId}`, newFileEntry);
             } else {
-                // await axios.post(`${API_URL}`, updatedArtworks);
-                await axios.post(`${API_URL}`, newFileEntry);
+                // await axios.post(`${ARTWORK_API_URL}`, updatedArtworks);
+                await axios.post(`${ARTWORK_API_URL}`, newFileEntry);
 
             }
 
@@ -310,7 +309,7 @@ function UploadForm() {
 
             //파일 객체는 로컬 스토리지에 저장되지 않으므로, 사용자에게 다시 선택하도록 안내
             if(draftData.previewUrl) {
-                alert('임시저장된 내용을 불러왔습니다.! 파일은 다시 선택해 주세요');
+                alert('임시저장된 내용을 불러왔습니다.!');
             }
 
             setHasDraft(false); //임시저장 알림은 삭제
@@ -345,14 +344,7 @@ function UploadForm() {
     //파일 삭제 최종 확인 및 처리
     const handleDeleteConfirmed = async () => {
         try {
-            // const response = await axios.get(`${API_URL}?artistId=${id}`);
-            // const artworks = response.data;
-
-            // artworks 배열에서 항목 제거
-            // const updatedArtworks = artworks.filter(artwork => artwork.id !== fileToDelete);
-
-            //삭제 시 uploads 에 있는 파일도 삭제 필요
-            await axios.delete(`${API_URL}/${fileToDelete}`);
+            await axios.delete(`${ARTWORK_API_URL}/${fileToDelete}`);
 
             // 이미지 파일 삭제 요청 추가
             const fileToDeleteObj = uploadedFiles.find(f => f.id === fileToDelete);
@@ -362,13 +354,7 @@ function UploadForm() {
                 });
             }
 
-            // if (fileToDeleteObj?.imageUrl) {
-            //     await axios.delete(DEL_API_URL, {
-            //         data: { imageUrl: fileToDeleteObj.imageUrl },
-            //     });
-            // }
-
-            const refreshed = await axios.get(`${API_URL}?artistId=${id}`);
+            const refreshed = await axios.get(`${ARTWORK_API_URL}?artistId=${id}`);
             setUploadedFiles(refreshed.data);
 
             localStorage.setItem('uploadedFiles', JSON.stringify(refreshed.data)); // 추가
