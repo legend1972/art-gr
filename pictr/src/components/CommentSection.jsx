@@ -6,22 +6,20 @@ import { Form, Button, ListGroup } from 'react-bootstrap';
 const API_URL = "http://localhost:3000/comments";
 
 //댓글 달기
-//artworkId: 작품ID
-function CommentSection({artworkId}) {
+function CommentSection({articleId}) {
     const [text, setText] = useState("");
     const [comments, setComments] = useState([]);
 
     //작품의 댓글 조회
     const loadComments = async () => {
-        // const res = await axios.get(`http://localhost:3000/comments?artworkId=${artworkId}`);
-        const res = await axios.get(`${API_URL}?artworkId=${artworkId}`);
+        const res = await axios.get(`${API_URL}?articleId=${articleId}`);
         setComments(res.data);
     }
 
     //artworkId 가 변경될 때마다 댓글 조회
     useEffect(() => {
         loadComments();
-    }, [artworkId]);
+    }, [articleId]);
 
     //댓글 저장
     const handleSubmit = async (e) => {
@@ -29,7 +27,7 @@ function CommentSection({artworkId}) {
         if(!text.trim()) return;
 
         const newComment = {
-            artworkId,
+            articleId,
             author: "익명", //댓글을 단 사람으로 변경 필요
             text,
 //            commentId, //comment 한 사람 id
@@ -73,7 +71,9 @@ function CommentSection({artworkId}) {
                             variant="outline-danger"
                             size="sm"
                             onClick={()=>handleDelete(comment.id)}
-                        />
+                        >
+                            삭제
+                        </Button>
                     </ListGroup.Item>
                 ))}            
             </ListGroup>

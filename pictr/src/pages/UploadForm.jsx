@@ -1,6 +1,6 @@
 import React, {useState, useRef, useEffect} from "react";
 import 'bootstrap/dist/css/bootstrap.min.css';
-import {Container, Card, Form, Button, Alert, Modal, ListGroup, Row, Col} from 'react-bootstrap';
+import {Container, Card, Form, Button, Alert, Modal, ListGroup} from 'react-bootstrap';
 import { MAX_LENGTH } from "../js/common/constants";
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -9,7 +9,9 @@ import { format } from 'date-fns';
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-const API_URL = "http://localhost:3000/artists";
+const API_URL = "http://localhost:3000/artworks";
+const UP_API_URL = "http://localhost:8080/api/upload-image";
+const DEL_API_URL = "http://localhost:8080/api/delete-image";
 
 //이미지 파일 업로드
 function UploadForm() {
@@ -27,40 +29,35 @@ function UploadForm() {
     const [fileToDelete, setFileToDelete] = useState(null); //삭제할 파일 ID
     const [selectedFileId, setSelectedFileId] = useState(null); // 선택된 파일 ID를 추적하기 위한 상태
     const fileInputRef = useRef(null); //파일 입력 필드 참조(Ref for File Input)
-    const { id } = useParams();
-
-    console.log("id: ", id);
-
-    //화면 Mount 시 db.json 파일의 uploads 내 리스트를 출력
+    // const { id } = useParams();
+    const id = "1";
+    
+    //화면 Mount 시 db.json 파일의 artworks 내 artistId 의 작품 리스트를 출력
     //API 호출 시 이미지 등록한 사용자로 조회하도록 변경 필요
     useEffect(() => {
         if(id) {
-            axios.get(`${API_URL}/${id}`).then(res => {
-                setUploadedFiles(res.data.artworks || []);
+            axios.get(`${API_URL}?artistId=${id}`).then(res => {
+                setUploadedFiles(res.data || []);
             }).catch(error => console.error("error fetch: ", error));
         }
     }, [id]);
 
     //파일 선택 핸들러
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const selectedFile = e.target.files[0]; //선택된 첫 번째 파일 가져오기
-        if(selectedFile) {
-            setFile(selectedFile); //파일 상태 업데이트
-
-            //이미지 파일인 경우
-            if(selectedFile.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = () => { //파일 읽기가 완료되면 실행될 콜백 함수
-                    setPreviewUrl(reader.result); //미리보기 URL 상태 업데이트 (reader.result: 파일의 내용을 Base64로 인코딩한 클라이언트 측 데이터 URL)
-                }
-
-                reader.readAsDataURL(selectedFile);
-            } else /* 이미지 파일이 아닌 경우 */ {
-                alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
-                setFile(null); //파일 초기화
-                return;
-            }
+        if(!selectedFile) return;
+        
+        if(!selectedFile.type.startsWith('image/')) {
+            alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
+            setFile(null);
+            return;
         }
+
+        setFile(selectedFile); //파일 상태 업데이트
+
+        const previewUrl = URL.createObjectURL(selectedFile); // 로컬 미리보기 URL
+        setPreviewUrl(previewUrl);
+
     };
 
     //파일 선택 버튼 클릭 핸들러
@@ -69,23 +66,34 @@ function UploadForm() {
     };
 
     //파일을 끌어다 놓을 때 핸들러
-    const handleDrop = (e) => {
+    const handleDrop = async (e) => {
         e.preventDefault();
         const droppedFile = e.dataTransfer.files[0]; //dataTransfer: 드래그 앤 드롭(Drag and Drop) 이벤트를 처리할 때 사용되는 객체
-        if (droppedFile) {
-            setFile(droppedFile);
+        if(!droppedFile) return;
 
-            //이미지 파일인 경우
-            if(droppedFile.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = () => setPreviewUrl(reader.result);
-                reader.readAsDataURL(droppedFile);
-            } else /* 이미지 파일이 아닌 경우 */ {
-                alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
-                setFile(null); //파일 초기화
-                return;
-            }
+        if(!droppedFile.type.startsWith('image/')) {
+            alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
+            setFile(null);
+            return;
         }
+
+        setFile(droppedFile);
+
+        try {
+            const formData = new FormData();
+            formData.append("file", droppedFile);
+
+            const uploadRes = await axios.post(UP_API_URL, formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+            });
+
+            setPreviewUrl(uploadRes.data.imageUrl);
+        } catch (error) {
+            alert("드래그한 파일 업로드에 실패했습니다.");
+            setFile(null);
+            setPreviewUrl("");
+        }
+        
     };
 
     //파일을 드롭했을 때 브라우저가 파일을 열거나 다운로드하지 않도록 막음.
@@ -145,7 +153,7 @@ function UploadForm() {
 
     //업로드 핸들러
     const handleUpload = async () => {
-        if(!file) {
+        if(!file && !previewUrl) {
             alert('파일을 선택해주세요!');
             return;
         }
@@ -169,34 +177,29 @@ function UploadForm() {
             alert('작품년월을 입력해 주세요!');
             return;
         }
-        
-        // //API 개발 시 수정 필요함.
-        // const newFileEntry = {
-        //     id: selectedFileId || String(Date.now()),
-        //     fileName: file ? file.name : uploadedFiles.find(f => f.id === selectedFileId)?.fileName,
-        //     title,
-        //     description,
-        //     titleofwork,
-        //     workYearMonth,
-        //     imageUrl: previewUrl, //미리보기 URL을 이미지 URL로 저장 (실제는 서버 URL)
-        //     uploadDate: new Date().toISOString() //업로드 날짜 기록
-        // };
+
+        let uploadedImageUrl = previewUrl;
         
         try {
-            const response = await axios.get(`${API_URL}/${id}`);
-            let imageUrl = previewUrl;
+            // 1. 파일이 새로 선택된 경우 서버에 업로드
+            if(file) {
+                const formData = new FormData();
+                formData.append("file", file);
 
-            //API 개발 시 수정 필요함.
-            // const url = selectedFileId
-            //     ? `${API_URL}?id=${id}/${selectedFileId}`
-            //     : `${API_URL}?id=${id}`;
-            // const method = selectedFileId ? 'PUT' : 'POST';
+                const uploadRes = await axios.post(UP_API_URL, formData, {
+                    headers: { "Content-Type": "multipart/form-data" }
+                });
 
-            // const response = await axios(url, {
-            //     method,
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(newFileEntry),
-            // });
+                uploadedImageUrl = uploadRes.data.imageUrl;
+            }
+
+            let artworks;
+
+            //작가의 작품들 추출
+            const response = await axios.get(`${API_URL}?artistId=${id}`);
+            if (response.status === 200) {
+                artworks = response.data;
+            }
 
             const newFileEntry = {
                 id: selectedFileId || String(Date.now()),
@@ -205,26 +208,28 @@ function UploadForm() {
                 description,
                 titleofwork,
                 workYearMonth,
-                imageUrl,
+                artistId: id,
+                imageUrl: uploadedImageUrl,
                 uploadDate: new Date().toISOString()
             };
-
-            const artist = response.data;
 
             let updatedArtworks;
             //기존 파일 목록에 새 파일 추가. 최근에 올린 이미지를 최상단에 위치 시킴.
             if (selectedFileId) {
                 // 기존 파일 업데이트
-                updatedArtworks = artist.artworks.map(artwork => artwork.id === selectedFileId ? newFileEntry : artwork);
+                updatedArtworks = artworks.map(artwork => artwork.id === selectedFileId ? newFileEntry : artwork);
             } else {
                 // 새 파일 추가
-                updatedArtworks = [...(artist.artworks || []), newFileEntry];
+                updatedArtworks = [newFileEntry, ...artworks];
             }
 
-            await axios.put(`${API_URL}/${id}`, {
-                ...artist,
-                artworks: updatedArtworks
-            });
+            if(selectedFileId) {
+                await axios.put(`${API_URL}/${selectedFileId}`, newFileEntry);
+            } else {
+                // await axios.post(`${API_URL}`, updatedArtworks);
+                await axios.post(`${API_URL}`, newFileEntry);
+
+            }
 
             setUploadedFiles(updatedArtworks);
             
@@ -333,41 +338,47 @@ function UploadForm() {
 
     //파일 삭제 확인 모달 열기
     const confirmDeleteFile = (id) => {
-        console.log('confirmDeleteFile 호출: ', typeof id);
         setFileToDelete(id); //삭제할 파일의 ID 저장
         setShowDeleteModal(true); //삭제 확인 모달 열기
     };
 
     //파일 삭제 최종 확인 및 처리
     const handleDeleteConfirmed = async () => {
-    try {
+        try {
+            // const response = await axios.get(`${API_URL}?artistId=${id}`);
+            // const artworks = response.data;
 
-        const response = await axios.get(`${API_URL}/${id}`);
-        
-        if (response.ok) {
-            const artist = response.data;
             // artworks 배열에서 항목 제거
-            const updatedArtworks = artist.artworks.filter(artwork => artwork.id !== fileToDelete);
+            // const updatedArtworks = artworks.filter(artwork => artwork.id !== fileToDelete);
 
-            // 아티스트 데이터 업데이트
-            await axios.put(`${API_URL}/${id}`, {
-                ...artist,
-                artworks: updatedArtworks
-            });
+            //삭제 시 uploads 에 있는 파일도 삭제 필요
+            await axios.delete(`${API_URL}/${fileToDelete}`);
 
-            setUploadedFiles(updatedArtworks);
-            localStorage.setItem('uploadedFiles', JSON.stringify(updatedArtworks)); // 추가
+            // 이미지 파일 삭제 요청 추가
+            const fileToDeleteObj = uploadedFiles.find(f => f.id === fileToDelete);
+            if (fileToDeleteObj?.imageUrl) {
+                await axios.post(DEL_API_URL, {
+                    imageUrl: fileToDeleteObj.imageUrl,
+                });
+            }
+
+            // if (fileToDeleteObj?.imageUrl) {
+            //     await axios.delete(DEL_API_URL, {
+            //         data: { imageUrl: fileToDeleteObj.imageUrl },
+            //     });
+            // }
+
+            const refreshed = await axios.get(`${API_URL}?artistId=${id}`);
+            setUploadedFiles(refreshed.data);
+
+            localStorage.setItem('uploadedFiles', JSON.stringify(refreshed.data)); // 추가
             alert('파일이 삭제되었습니다.');
-        }else {
+        } catch (error) {
             alert('삭제 실패: 파일을 찾을 수 없습니다.');
+        } finally {
+            setShowDeleteModal(false);
+            setFileToDelete(null);
         }
-    } catch (error) {
-        console.error('삭제 중 오류 발생:', error);
-        alert('삭제 중 오류 발생');
-    } finally {
-        setShowDeleteModal(false);
-        setFileToDelete(null);
-    }
     };
 
     // yyyyMM 문자열을 Date 객체로 변환
