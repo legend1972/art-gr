@@ -1,0 +1,46 @@
+/* src/css/Editor.css */
+/* .editor-toolbar {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+  background: #f8f8f8;
+  padding: 5px;
+  border: 1px solid #ddd;
+} */
+
+/* src/css/Editor.css */
+.editor { min-height: 300px; }
+/* .editor-paragraph { margin: 0; }
+.editor-paragraph[style*="text-align: left"] { text-align: left !important; }
+.editor-paragraph[style*="text-align: center"] { text-align: center !important; }
+.editor-paragraph[style*="text-align: right"] { text-align: right !important; } */
+
+
+.editor-paragraph {
+  margin: 0 0 15px 0;
+  position: relative;
+}
+
+.editor-paragraph.text-align-left {
+  text-align: left;
+}
+
+.editor-paragraph.text-align-center {
+  text-align: center;
+}
+
+.editor-paragraph.text-align-right {
+  text-align: right;
+}
+
+.editor-bold {
+  font-weight: bold;
+}
+
+.editor-italic {
+  font-style: italic;
+}
+
+.editor-underline {
+  text-decoration: underline; /* 이 부분을 추가하세요 */
+}
