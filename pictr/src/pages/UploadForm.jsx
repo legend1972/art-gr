@@ -147,7 +147,7 @@ function UploadForm() {
         setWorkYearMonth(file.workYearMonth || null);
         setPreviewUrl(file.imageUrl || '');
         setFile(null); // 파일은 다시 선택해야 함
-        alert('파일 정보를 불러왔습니다. 이미지를 변경하려면 새 파일을 선택하세요.');
+        alert('파일 정보를 불러왔습니다.');
     };
 
     //업로드 핸들러
@@ -209,6 +209,7 @@ function UploadForm() {
                 workYearMonth,
                 artistId: id,
                 imageUrl: uploadedImageUrl,
+                artistName: "",
                 uploadDate: new Date().toISOString()
             };
 

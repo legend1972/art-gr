@@ -13,6 +13,7 @@ function Layout({ children }) {
                         <Nav className="ms-auto">
                             <Nav.Link as={Link} to="/">Home</Nav.Link>
                             <Nav.Link as={Link} to="/artist/new">Add Artist</Nav.Link>
+                            <Nav.Link as={Link} to="/article/search">검색</Nav.Link>
                         </Nav>
                     </Navbar.Collapse>
                 </Container>

@@ -26,7 +26,7 @@ function ArtistList({ artists, selectedArtist, setSelectedArtist, setArtworks}) 
                         <Image src={artist.photo} roundedCircle width={40} className="me-3"/>
                         <div>
                             <strong>
-                                <Link to={`/artist/${artist.id}`} className="text-decoration-none">
+                                <Link to={`/artist/${artist.id}`} className={`text-decoration-none ${selectedArtist?.id === artist.id ? 'text-white' : 'text-dark'}`}>
                                     {artist.name}
                                 </Link>
                             </strong><br />

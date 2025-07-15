@@ -15,6 +15,7 @@ import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { ListNode, ListItemNode } from "@lexical/list";
 import { ParagraphNode, $getSelection, $isRangeSelection, FORMAT_TEXT_COMMAND, FORMAT_ELEMENT_COMMAND } from "lexical";
 import ImagePlugin, { INSERT_IMAGE_COMMAND } from "../components/ImagePlugin";
+import { $patchStyleText } from "@lexical/selection";
 import { ImageNode } from "../js/ImageNode";
 import "../css/Editor.css"; // CSS 임포트
 
@@ -25,7 +26,7 @@ const UP_API_URL = `${BASE_URL}/api/upload-image`;
 const ARTICLES_API_URL = "http://localhost:3000/articles"; // json-server 주소 (필요시 수정)
 
 function ArticleForm({ isEdit = false }) {
-  const { id } = useParams();
+  const { artworkId, id } = useParams();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [images, setImages] = useState([]); // 저장 시점에 포함된 이미지 목록을 추적
@@ -45,21 +46,21 @@ function ArticleForm({ isEdit = false }) {
 
   useEffect(() => {
     if (isEdit && id) {
-      axios
-        .get(`${ARTICLES_API_URL}/${id}`)
-        .then((res) => {
+      //기사 추출
+      axios.get(`${ARTICLES_API_URL}/${id}`).then((res) => {
           setTitle(res.data.title || "");
+
           try {
             JSON.parse(res.data.content);
             contentRef.current = res.data.content;
           } catch (e) {
             contentRef.current = initialEditorState;
           }
+
           setImages(res.data.images || []);
           setTags(res.data.tags || []);
           setIsLoaded(true);
-        })
-        .catch((error) => {
+        }).catch((error) => {
           console.error("Failed to load article:", error);
           contentRef.current = initialEditorState;
           setIsLoaded(true);
@@ -75,8 +76,6 @@ function ArticleForm({ isEdit = false }) {
     const options = { maxSizeMB: 1, maxWidthOrHeight: 1024 };
     return await imageCompression(file, options);
   };
-
-  // ArticleForm.js 파일 내에서 이 함수를 찾아 교체하세요.
 
   const handleImageUpload = async (e, editor) => {
       try {
@@ -159,6 +158,7 @@ function ArticleForm({ isEdit = false }) {
         content: contentRef.current,
         images, // 최종적으로 포함된 이미지 정보 배열
         tags,
+        artworkId,
         updatedAt: new Date().toISOString(),
       };
 
@@ -185,7 +185,8 @@ function ArticleForm({ isEdit = false }) {
         editor.update(() => {
           const selection = $getSelection();
           if ($isRangeSelection(selection)) {
-            selection.patchStyleText(style);
+            // selection.patchStyleText(style);
+            $patchStyleText(selection, style);
           }
         });
     };
@@ -236,7 +237,7 @@ function ArticleForm({ isEdit = false }) {
 
   return (
     <div className="container py-4">
-      <h2>{isEdit ? "기사 수정" : "기사 작성"}</h2>
+      <h2>{isEdit ? "작품 내용 수정하기" : "작품 내용 등록하기"}</h2>
       <Form.Group className="mb-3">
         <Form.Control type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="제목을 입력하세요." />
       </Form.Group>

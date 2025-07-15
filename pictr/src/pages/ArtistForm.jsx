@@ -4,11 +4,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:3000/artists';
+const UP_API_URL = "http://localhost:8080/api/upload-image";
 
 function ArtistForm({ isEdit = false}) {
-    const [artist, setArtist] = useState({name: '', bio: '', country: '', birthYear: '', photo: '', artworks: []});
+    //artworks: []
+    const [artist, setArtist] = useState({name: '', bio: '', country: '', birthYear: '', photo: '' });
     const {id} = useParams();
     const navigate = useNavigate();
+    //setPreviewPhoto: 비동기 함수
     const [previewPhoto, setPreviewPhoto] = useState('');
 
     useEffect(() => {
@@ -26,24 +29,39 @@ function ArtistForm({ isEdit = false}) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if(isEdit) {
-            console.log("isEdit is not null");
             axios.put(`${API_URL}/${artist.id}`, artist).then(() => navigate('/'));
         } else {
-            console.log("isEdit is null");
             axios.post(API_URL, artist).then(() => navigate('/'));
         }
     };
 
-    const handlePhotoChange = (e) =>{
-        const file = e.target.files[0];
-        if(file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                setPreviewPhoto(reader.result);
-                setArtist({...artist, photo: reader.result});
-            }
-            reader.readAsDataURL(file);
+    const handlePhotoChange = async (e) =>{
+        const selectedFile = e.target.files[0];
+        if(!selectedFile) return;
+
+        if(!selectedFile.type.startsWith('image/')) {
+            alert("이미지 파일이 아닙니다. 다시 선택해 주세요.");
+            return;
         }
+
+        let imageUrl = "";
+        try {
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            const uploadRes = await axios.post(UP_API_URL, formData, {
+                headers: { "Content-Type": "multipart/form-data"}
+            });
+
+            imageUrl = uploadRes.data.imageUrl;
+            setPreviewPhoto(imageUrl);
+        } catch (error) {
+            alert("파일 업로드에 실패했습니다.");
+            setPreviewPhoto("");
+        }
+
+        console.log("previewPhoto: ", imageUrl);
+        setArtist({...artist, photo: imageUrl});
     };
 
     return (
@@ -66,7 +84,7 @@ function ArtistForm({ isEdit = false}) {
                     <Form.Label htmlFor="birthYear">출생년도</Form.Label>
                     <Form.Control type="number" id="birthYear" value={artist.birthYear} onChange={e => setArtist({...artist, birthYear: e.target.value})}/>
                 </Form.Group>
-                <Form.Group className="mb-3" controlId="photo">
+                <Form.Group className="mb-3">
                     <Form.Label htmlFor="photo">사진 업로드</Form.Label>
                     <Form.Control type="file" id="photo" accept="image/" onChange={handlePhotoChange}/>
                     {previewPhoto && (

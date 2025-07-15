@@ -10,7 +10,6 @@ function ArtworkCard({ artwork }) {
     return (
         // 나중에 완료되면 풀어야 함.
         <Card as={Link} to={`/artwork/${artwork.id}`} className="text-decoration-none text-dark">
-        {/* <Card className="text-decoration-none text-dark"> */}
             <Card.Img variant="top" src={artwork.imageUrl}/>
             <Card.Body>
                 <Card.Title>{artwork.title}</Card.Title>

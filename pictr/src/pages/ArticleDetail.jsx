@@ -86,7 +86,7 @@ function ArticleDetail() {
                 </LexicalComposer>
             </div>
 
-            <Link to={`/article/edit/${encodeURIComponent(article.id)}`} className="btn btn-primary mt-3">수정하기</Link>
+            <Link to={`/article/edit/${article.artworkId}/${encodeURIComponent(id)}`} className="btn btn-primary mt-3">수정하기</Link>
 
             <hr className="my-4" />
 
